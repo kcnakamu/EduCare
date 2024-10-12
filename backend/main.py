@@ -37,7 +37,10 @@ def mic_callback(input_data, frame_count, time_info, status_flag):
 
 async def run():
     """Establishes connection with Deepgram and streams microphone data."""
-    url = "wss://api.deepgram.com/v1/listen?punctuate=true&encoding=linear16&sample_rate=16000"
+    url = (
+        "wss://api.deepgram.com/v1/listen?"
+        "punctuate=true&diarize=true&encoding=linear16&sample_rate=16000"
+    )
     headers = {"Authorization": f"Token {API_KEY}"}
 
     async with websockets.connect(url, extra_headers=headers) as ws:
@@ -56,22 +59,19 @@ async def run():
                 print(f"Error during streaming: {e}")
 
         async def receiver():
-            """Receives and prints transcription results."""
+            """Receives and processes transcription results with diarization."""
             global full_transcription  # Use global to accumulate the transcript
 
             async for msg in ws:
                 res = json.loads(msg)
                 if res.get("is_final"):
-                    transcript = (
-                        res.get("channel", {})
-                        .get("alternatives", [{}])[0]
-                        .get("transcript", "")
-                    )
-                    if transcript:
-                        print(f"Transcript: {transcript}")
-                        full_transcription += f" {transcript}"  # Accumulate the full transcript
+                    words = res.get("channel", {}).get("alternatives", [{}])[0].get("words", [])
+                    if words:
+                        transcript_segment = format_transcript_by_speaker(words)
+                        print(transcript_segment)  # Print speaker-labeled transcript
+                        full_transcription += transcript_segment  # Accumulate the full transcript
 
-                    if "goodbye" in transcript.lower():
+                    if "goodbye" in full_transcription.lower():
                         await ws.send(json.dumps({"type": "CloseStream"}))
                         print("🟢 'Goodbye' detected. Saving final transcript.")
                         save_full_transcription_to_firestore(full_transcription)
@@ -96,6 +96,26 @@ async def run():
             stream.close()
 
         await asyncio.gather(microphone(), sender(), receiver())
+
+def format_transcript_by_speaker(words):
+    """Formats the transcript with speaker labels."""
+    speaker_transcripts = {}  # Store words by speaker
+
+    for word_info in words:
+        speaker = f"Speaker {word_info.get('speaker', 'unknown')}"
+        word = word_info["word"]
+
+        if speaker not in speaker_transcripts:
+            speaker_transcripts[speaker] = []
+        speaker_transcripts[speaker].append(word)
+
+    # Combine speaker segments into a readable string
+    formatted_transcript = ""
+    for speaker, transcript_words in speaker_transcripts.items():
+        segment = f"[{speaker}] {' '.join(transcript_words)}\n"
+        formatted_transcript += segment
+
+    return formatted_transcript
 
 def save_full_transcription_to_firestore(transcript):
     """Saves the entire transcription session to Firestore."""
