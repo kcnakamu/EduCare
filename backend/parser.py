@@ -72,6 +72,13 @@ def fetch_notes_from_firestore(document_id):
     else:
         raise ValueError("No such document found!")
 
+def save_to_firestore(data, document_id):
+    '''
+    Save the parser output to Firestore under a new collection 'parser_output'.
+    '''
+    doc_ref = db.collection("parser_output").document(document_id)
+    doc_ref.set(data)  # Save data to Firestore
+
 if __name__ == "__main__":
     document_id = "vMGc7EC72SrLODfpYs0i"  # Replace with your Firestore document ID
 
@@ -84,3 +91,8 @@ if __name__ == "__main__":
     tokens_with_icd = add_icd(tokens)  # Augment tokens with ICD-10 codes
 
     print(tokens_with_icd)  # Output the processed result
+
+    # Save the parsed result to Firestore
+    save_to_firestore(tokens_with_icd, document_id)
+
+    print(f"Parsed output saved to Firestore with document ID: {document_id}")
