@@ -21,6 +21,16 @@ def tokenize(transcript):
     for entity in result:
         report_dict.setdefault(entity['entity_group'], []).append(entity['word'])
     
+    # Remove duplicates from each list
+    for key in report_dict:
+        if isinstance(report_dict[key], list):
+            if all(isinstance(i, tuple) for i in report_dict[key]):  # If the item is a list of tuples
+                # For lists of tuples, we can convert to a set of tuples for uniqueness
+                report_dict[key] = list(set(report_dict[key]))
+            else:
+                # Convert to set to remove duplicates, then back to list
+                report_dict[key] = list(set(report_dict[key]))
+                
     return report_dict
 
 def query_icd10cm(terms):
