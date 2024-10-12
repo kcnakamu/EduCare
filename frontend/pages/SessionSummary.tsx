@@ -1,164 +1,156 @@
-"use client"
-import React, { useState } from "react";
+"use client";
+import React, { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebaseConfig"; // Import Firestore config
 
+// Adjusted interface to reflect Firestore data structure
 interface VisitSummaryData {
-  visitSummary: string;
-  instructions: string;
-  nextSteps: string;
-  commonSymptoms: string[];
+  doctor_notes: string;
+  patient_notes: string;
+  concise_summary: string;
+  doctor_diagnosis: string[];
+  follow_up_required: string;
+  prescription_given: boolean;
+  meeting_minutes: number;
+  timestamp: string;
+  patient_concerns: string[];
 }
 
 const VisitSummary: React.FC = () => {
+  const [summaryData, setSummaryData] = useState<VisitSummaryData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [summaryData, setSummaryData] = useState<VisitSummaryData>({
-    visitSummary:
-      "CPT Code 99213: Office visit for evaluation and management of a patient with mild headaches. No major concerns found during physical exam.",
-    instructions:
-      "Prescriptions: 500mg Ibuprofen for pain relief. Instructions: Drink 8 glasses of water per day, take medication as prescribed.",
-    nextSteps:
-      "Monitor symptoms for two weeks. Follow up with the doctor if conditions worsen.",
-    commonSymptoms: ["Severe headaches", "Nausea", "Dizziness", "Fever"],
-  });
 
-  const [editedData, setEditedData] = useState<VisitSummaryData>(summaryData);
+  // Fetch Firestore data on component load
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const docRef = doc(db, "meeting_summaries", "D2lKMHDmHctcr1WX9dkr"); // Use your document ID
+        const docSnap = await getDoc(docRef);
 
-  const handleEditClick = () => {
-    setIsEditing(true);
-  };
+        if (docSnap.exists()) {
+          const data = docSnap.data() as VisitSummaryData;
+          console.log("Fetched Data:", data); // Debugging log
 
-  const handleSaveClick = () => {
-    setSummaryData(editedData); // Save the edited data
-    setIsEditing(false);
-  };
+          // Provide fallback values for missing fields
+          setSummaryData({
+            doctor_notes: data.doctor_notes || "",
+            patient_notes: data.patient_notes || "",
+            concise_summary: data.concise_summary || "",
+            doctor_diagnosis: data.doctor_diagnosis || [],
+            follow_up_required: data.follow_up_required || "no",
+            prescription_given: data.prescription_given || false,
+            meeting_minutes: data.meeting_minutes || 0,
+            timestamp: data.timestamp || "",
+            patient_concerns: data.patient_concerns || [],
+          });
+        } else {
+          console.error("No such document!");
+        }
+      } catch (error) {
+        console.error("Error fetching document:", error);
+      }
+    };
 
-  const handleApproveClick = () => {
-    alert("Summary Approved");
-  };
+    fetchData();
+  }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,
-    field: keyof VisitSummaryData
-  ) => {
-    if (field === "commonSymptoms") {
-      setEditedData({
-        ...editedData,
-        [field]: e.target.value.split("\n"), // Split by new lines
-      });
-    } else {
-      setEditedData({ ...editedData, [field]: e.target.value });
-    }
-  };
+  if (!summaryData) {
+    return <p>Loading...</p>; // Show loading state
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg">
       <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
-        Doctor Visit Summary (CPT: 99213)
+        Doctor Visit Summary
       </h2>
 
-      <div className="flex justify-end space-x-4 mb-6">
-        {isEditing ? (
-          <button
-            onClick={handleSaveClick}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Save
-          </button>
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">Doctor Notes</h3>
+        <p className="text-gray-700 mt-2">{summaryData.doctor_notes}</p>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">Patient Notes</h3>
+        <p className="text-gray-700 mt-2">
+          {summaryData.patient_notes || "No patient notes available."}
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">Concise Summary</h3>
+        <p className="text-gray-700 mt-2">{summaryData.concise_summary}</p>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">
+          Doctor's Diagnosis
+        </h3>
+        <ul className="list-disc list-inside text-gray-700 mt-2">
+          {(summaryData.doctor_diagnosis || []).map((diagnosis, index) => (
+            <li key={index}>{diagnosis}</li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">Follow-up Required</h3>
+        <p className="text-gray-700 mt-2">
+          {summaryData.follow_up_required === "yes"
+            ? "Follow-up is required."
+            : "No follow-up needed."}
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">
+          Prescription Given
+        </h3>
+        <p className="text-gray-700 mt-2">
+          {summaryData.prescription_given ? "Yes" : "No"}
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">
+          Meeting Minutes
+        </h3>
+        <p className="text-gray-700 mt-2">{summaryData.meeting_minutes} minutes</p>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">Patient Concerns</h3>
+        {summaryData.patient_concerns.length > 0 ? (
+          <ul className="list-disc list-inside text-gray-700 mt-2">
+            {summaryData.patient_concerns.map((concern, index) => (
+              <li key={index}>{concern}</li>
+            ))}
+          </ul>
         ) : (
-          <button
-            onClick={handleEditClick}
-            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-          >
-            Edit
-          </button>
+          <p className="text-gray-700 mt-2">No patient concerns recorded.</p>
         )}
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-blue-600">Timestamp</h3>
+        <p className="text-gray-700 mt-2">{summaryData.timestamp}</p>
+      </div>
+
+      <div className="flex justify-end space-x-4">
         <button
-          onClick={handleApproveClick}
+          onClick={() => setIsEditing(!isEditing)}
+          className={`px-4 py-2 rounded text-white ${
+            isEditing ? "bg-blue-500 hover:bg-blue-600" : "bg-yellow-500 hover:bg-yellow-600"
+          }`}
+        >
+          {isEditing ? "Save" : "Edit"}
+        </button>
+        <button
+          onClick={() => alert("Summary Approved")}
           className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
         >
           Approve
         </button>
       </div>
-
-      {/* Render the summary in editable or read-only mode */}
-      {isEditing ? (
-        <div>
-          {/* Editable fields */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Visit Summary
-            </h3>
-            <textarea
-              className="w-full border p-2 mt-2"
-              value={editedData.visitSummary}
-              onChange={(e) => handleChange(e, "visitSummary")}
-            />
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Instructions / Prescription
-            </h3>
-            <textarea
-              className="w-full border p-2 mt-2"
-              value={editedData.instructions}
-              onChange={(e) => handleChange(e, "instructions")}
-            />
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">Next Steps</h3>
-            <textarea
-              className="w-full border p-2 mt-2"
-              value={editedData.nextSteps}
-              onChange={(e) => handleChange(e, "nextSteps")}
-            />
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Common Symptoms to Watch For
-            </h3>
-            <textarea
-              className="w-full border p-2 mt-2"
-              value={editedData.commonSymptoms.join("\n")} // Join array into a single string
-              onChange={(e) => handleChange(e, "commonSymptoms")}
-            />
-          </div>
-        </div>
-      ) : (
-        <div>
-          {/* Read-only fields */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Visit Summary
-            </h3>
-            <p className="text-gray-700 mt-2">{summaryData.visitSummary}</p>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Instructions / Prescription
-            </h3>
-            <p className="text-gray-700 mt-2">{summaryData.instructions}</p>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">Next Steps</h3>
-            <p className="text-gray-700 mt-2">{summaryData.nextSteps}</p>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-600">
-              Common Symptoms to Watch For
-            </h3>
-            <ul className="list-disc list-inside text-gray-700 mt-2">
-              {summaryData.commonSymptoms.map((symptom, index) => (
-                <li key={index}>{symptom}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

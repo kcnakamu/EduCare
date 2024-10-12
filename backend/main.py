@@ -3,11 +3,12 @@ import asyncio
 import json
 import os
 import websockets
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
 import spacy
+from nltk.tokenize import sent_tokenize
 
 # Load scispaCy model for medical NLP
 nlp = spacy.load("en_core_sci_sm")
@@ -104,22 +105,43 @@ def generate_meeting_summary():
     # Extract key medical terms using scispaCy
     patient_notes = " ".join(speaker_transcripts[1])
     doctor_notes = " ".join(speaker_transcripts[0])
-    
+
     patient_doc = nlp(patient_notes)
     doctor_doc = nlp(doctor_notes)
 
     patient_keywords = [ent.text for ent in patient_doc.ents]
     doctor_keywords = [ent.text for ent in doctor_doc.ents]
 
-    summary = {
+    # Generate a concise summary using extracted keywords and sentences
+    summary_sentences = []
+    if patient_keywords:
+        summary_sentences.append(
+            f"The patient reported the following concerns: {', '.join(patient_keywords)}."
+        )
+    if doctor_keywords:
+        summary_sentences.append(
+            f"The doctor diagnosed the following: {', '.join(doctor_keywords)}."
+        )
+    if "follow" in doctor_notes.lower():
+        summary_sentences.append("The patient was advised to follow up.")
+    if any(
+        keyword in doctor_notes.lower()
+        for keyword in ["medication", "drug", "prescription"]
+    ):
+        summary_sentences.append("A prescription was provided.")
+
+    concise_summary = " ".join(summary_sentences)
+    return {
         "meeting_minutes": len(patient_notes.split()) + len(doctor_notes.split()),
         "patient_concerns": patient_keywords,
         "doctor_diagnosis": doctor_keywords,
+        "concise_summary": concise_summary,
         "follow_up_required": "yes" if "follow" in doctor_notes.lower() else "no",
-        "prescription_given": any(keyword.lower() in doctor_notes.lower() for keyword in ["medication", "drug", "prescription"]),
+        "prescription_given": any(
+            keyword in doctor_notes.lower()
+            for keyword in ["medication", "drug", "prescription"]
+        ),
     }
-
-    return summary
 
 def save_summary_to_firestore():
     """Saves the generated summary to Firestore."""
@@ -130,7 +152,7 @@ def save_summary_to_firestore():
         "doctor_notes": " ".join(speaker_transcripts[0]),
         "patient_notes": " ".join(speaker_transcripts[1]),
         "summary": summary,
-        "timestamp": timestamp
+        "timestamp": timestamp,
     }
 
     doc_ref = db.collection("meeting_summaries").document()
