@@ -13,32 +13,48 @@ interface VisitSummaryData {
   meeting_minutes: number;
   timestamp: string;
   patient_concerns: string[];
+  approved?: boolean; // Optional field to track approval status
+}
+
+interface ParserOutput {
+  [key: string]: string[]; // Parser output as a dynamic key-value object
 }
 
 const VisitSummary: React.FC = () => {
   const [summaryData, setSummaryData] = useState<VisitSummaryData | null>(null);
+  const [parserData, setParserData] = useState<ParserOutput | null>(null);
   const [editedData, setEditedData] = useState<VisitSummaryData | null>(null);
+  const [editedParserData, setEditedParserData] = useState<ParserOutput | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const documentId = "D2lKMHDmHctcr1WX9dkr"; // Replace with your Firestore document ID
+  const documentId = "vMGc7EC72SrLODfpYs0i"; // Replace with your Firestore document ID
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const docRef = doc(db, "meeting_summaries", documentId);
+        const parserRef = doc(db, "parser_output", documentId);
+
         const docSnap = await getDoc(docRef);
+        const parserSnap = await getDoc(parserRef);
 
         if (docSnap.exists()) {
           const data = docSnap.data() as VisitSummaryData;
-          console.log("Fetched Data:", data);
-
           setSummaryData(data);
-          setEditedData(data); // Initialize editing mode with fetched data
+          setEditedData(data); // Initialize with fetched data
         } else {
-          console.error("No such document!");
+          console.error("No summary data found!");
+        }
+
+        if (parserSnap.exists()) {
+          const parserData = parserSnap.data() as ParserOutput;
+          setParserData(parserData);
+          setEditedParserData(parserData); // Initialize with fetched parser data
+        } else {
+          console.error("No parser data found!");
         }
       } catch (error) {
-        console.error("Error fetching document:", error);
+        console.error("Error fetching data:", error);
       }
     };
 
@@ -54,41 +70,46 @@ const VisitSummary: React.FC = () => {
     }
   };
 
-  const handleBooleanChange = (field: keyof VisitSummaryData) => {
-    if (editedData) {
-      setEditedData({ ...editedData, [field]: !editedData[field] });
-    }
-  };
-
-  const handleArrayChange = (
-    index: number,
-    value: string,
-    field: keyof VisitSummaryData
-  ) => {
-    if (editedData && Array.isArray(editedData[field])) {
-      const newArray = [...(editedData[field] as string[])];
+  const handleParserChange = (key: string, index: number, value: string) => {
+    if (editedParserData) {
+      const newArray = [...(editedParserData[key] || [])];
       newArray[index] = value;
-      setEditedData({ ...editedData, [field]: newArray });
+      setEditedParserData({ ...editedParserData, [key]: newArray });
     }
   };
 
   const handleSaveClick = async () => {
-    if (!editedData) return;
-
     try {
-      const docRef = doc(db, "meeting_summaries", documentId);
-      await updateDoc(docRef, editedData);
+      const summaryRef = doc(db, "meeting_summaries", documentId);
+      const parserRef = doc(db, "parser_output", documentId);
+
+      if (editedData) await updateDoc(summaryRef, editedData);
+      if (editedParserData) await updateDoc(parserRef, editedParserData);
 
       setSummaryData(editedData); // Update UI with saved data
-      setIsEditing(false); // Exit edit mode
-      alert("Summary updated successfully!");
+      setParserData(editedParserData); // Update UI with saved parser data
+      setIsEditing(false);
+      alert("Data updated successfully!");
     } catch (error) {
-      console.error("Error updating document:", error);
-      alert("Failed to update summary. Please try again.");
+      console.error("Error updating data:", error);
+      alert("Failed to update data. Please try again.");
     }
   };
 
-  if (!summaryData) {
+  const handleApproveClick = async () => {
+    try {
+      const summaryRef = doc(db, "meeting_summaries", documentId);
+      await updateDoc(summaryRef, { approved: true });
+
+      setSummaryData((prev) => ({ ...prev!, approved: true }));
+      alert("Summary approved successfully!");
+    } catch (error) {
+      console.error("Error approving summary:", error);
+      alert("Failed to approve summary. Please try again.");
+    }
+  };
+
+  if (!summaryData || !parserData) {
     return <p>Loading...</p>;
   }
 
@@ -98,7 +119,7 @@ const VisitSummary: React.FC = () => {
         Doctor Visit Summary
       </h2>
 
-      {/** Doctor Notes */}
+      {/* Doctor Notes */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-blue-600">Doctor Notes</h3>
         {isEditing ? (
@@ -112,80 +133,33 @@ const VisitSummary: React.FC = () => {
         )}
       </div>
 
-      {/** Patient Notes */}
+      {/* Parser Output */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-blue-600">Patient Notes</h3>
-        {isEditing ? (
-          <textarea
-            className="w-full border p-2 mt-2"
-            value={editedData?.patient_notes || ""}
-            onChange={(e) => handleChange(e, "patient_notes")}
-          />
-        ) : (
-          <p className="text-gray-700 mt-2">{summaryData.patient_notes}</p>
-        )}
+        <h3 className="text-lg font-semibold text-blue-600">Parser Output</h3>
+        {Object.entries(parserData).map(([key, values], index) => (
+          <div key={index} className="mb-4">
+            <h4 className="font-semibold text-gray-600">{key}</h4>
+            {isEditing ? (
+              values.map((value, i) => (
+                <input
+                  key={i}
+                  className="w-full border p-2 mt-2"
+                  value={value}
+                  onChange={(e) => handleParserChange(key, i, e.target.value)}
+                />
+              ))
+            ) : (
+              <ul className="list-disc list-inside text-gray-700">
+                {values.map((value, i) => (
+                  <li key={i}>{value}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/** Doctor's Diagnosis */}
-<div className="mb-6">
-  <h3 className="text-lg font-semibold text-blue-600">Doctor's Diagnosis</h3>
-  {isEditing ? (
-    (editedData?.doctor_diagnosis || []).map((diagnosis, index) => (
-      <input
-        key={index}
-        className="w-full border p-2 mt-2"
-        value={diagnosis || ""} // Ensure fallback value
-        onChange={(e) =>
-          handleArrayChange(index, e.target.value, "doctor_diagnosis")
-        }
-      />
-    ))
-  ) : (
-    <ul className="list-disc list-inside text-gray-700 mt-2">
-      {(summaryData?.doctor_diagnosis || []).map((diagnosis, index) => (
-        <li key={index}>{diagnosis || "N/A"}</li> // Provide fallback value
-      ))}
-    </ul>
-  )}
-</div>
-
-
-      {/** Meeting Minutes */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-blue-600">Meeting Minutes</h3>
-        {isEditing ? (
-          <input
-            type="number"
-            className="w-full border p-2 mt-2"
-            value={editedData?.meeting_minutes || 0}
-            onChange={(e) => handleChange(e, "meeting_minutes")}
-          />
-        ) : (
-          <p className="text-gray-700 mt-2">
-            {summaryData.meeting_minutes} minutes
-          </p>
-        )}
-      </div>
-
-      {/** Follow-up Required */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-blue-600">Follow-up Required</h3>
-        {isEditing ? (
-          <input
-            className="w-full border p-2 mt-2"
-            value={editedData?.follow_up_required || ""}
-            onChange={(e) => handleChange(e, "follow_up_required")}
-          />
-        ) : (
-          <p className="text-gray-700 mt-2">
-            {summaryData.follow_up_required === "yes"
-              ? "Follow-up is required."
-              : "No follow-up needed."}
-          </p>
-        )}
-      </div>
-
-      {/** Save and Edit Buttons */}
+      {/* Save, Edit, and Approve Buttons */}
       <div className="flex justify-end space-x-4">
         <button
           onClick={isEditing ? handleSaveClick : () => setIsEditing(true)}
@@ -196,7 +170,7 @@ const VisitSummary: React.FC = () => {
           {isEditing ? "Save" : "Edit"}
         </button>
         <button
-          onClick={() => alert("Summary Approved")}
+          onClick={handleApproveClick}
           className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
         >
           Approve
