@@ -3,10 +3,14 @@ import asyncio
 import json
 import os
 import websockets
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
+import spacy
+
+# Load scispaCy model for medical NLP
+nlp = spacy.load("en_core_sci_sm")
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,7 +32,7 @@ CHUNK = 8000
 audio_queue = asyncio.Queue()
 
 # Initialize variables
-full_transcription = ""  # Store the complete transcription
+speaker_transcripts = {0: [], 1: []}  # Track doctor and patient notes by speaker ID
 
 def mic_callback(input_data, frame_count, time_info, status_flag):
     """Handles microphone data streaming."""
@@ -37,10 +41,7 @@ def mic_callback(input_data, frame_count, time_info, status_flag):
 
 async def run():
     """Establishes connection with Deepgram and streams microphone data."""
-    url = (
-        "wss://api.deepgram.com/v1/listen?"
-        "punctuate=true&diarize=true&encoding=linear16&sample_rate=16000"
-    )
+    url = "wss://api.deepgram.com/v1/listen?diarize=true&punctuate=true&encoding=linear16&sample_rate=16000"
     headers = {"Authorization": f"Token {API_KEY}"}
 
     async with websockets.connect(url, extra_headers=headers) as ws:
@@ -59,22 +60,11 @@ async def run():
                 print(f"Error during streaming: {e}")
 
         async def receiver():
-            """Receives and processes transcription results with diarization."""
-            global full_transcription  # Use global to accumulate the transcript
-
+            """Receives and prints transcription results."""
             async for msg in ws:
                 res = json.loads(msg)
                 if res.get("is_final"):
-                    words = res.get("channel", {}).get("alternatives", [{}])[0].get("words", [])
-                    if words:
-                        transcript_segment = format_transcript_by_speaker(words)
-                        print(transcript_segment)  # Print speaker-labeled transcript
-                        full_transcription += transcript_segment  # Accumulate the full transcript
-
-                    if "goodbye" in full_transcription.lower():
-                        await ws.send(json.dumps({"type": "CloseStream"}))
-                        print("🟢 'Goodbye' detected. Saving final transcript.")
-                        save_full_transcription_to_firestore(full_transcription)
+                    process_transcription(res)
 
         async def microphone():
             """Captures microphone input."""
@@ -97,35 +87,55 @@ async def run():
 
         await asyncio.gather(microphone(), sender(), receiver())
 
-def format_transcript_by_speaker(words):
-    """Formats the transcript with speaker labels."""
-    speaker_transcripts = {}  # Store words by speaker
-
+def process_transcription(res):
+    """Processes and categorizes the transcription by speaker."""
+    words = res["channel"]["alternatives"][0].get("words", [])
     for word_info in words:
-        speaker = f"Speaker {word_info.get('speaker', 'unknown')}"
+        speaker = word_info.get("speaker", "unknown")
         word = word_info["word"]
-
-        if speaker not in speaker_transcripts:
-            speaker_transcripts[speaker] = []
         speaker_transcripts[speaker].append(word)
 
-    # Combine speaker segments into a readable string
-    formatted_transcript = ""
-    for speaker, transcript_words in speaker_transcripts.items():
-        segment = f"[{speaker}] {' '.join(transcript_words)}\n"
-        formatted_transcript += segment
+        if "goodbye" in word.lower():
+            print("🟢 'Goodbye' detected. Saving final transcript.")
+            save_summary_to_firestore()
 
-    return formatted_transcript
+def generate_meeting_summary():
+    """Generates a structured summary from the meeting."""
+    # Extract key medical terms using scispaCy
+    patient_notes = " ".join(speaker_transcripts[1])
+    doctor_notes = " ".join(speaker_transcripts[0])
+    
+    patient_doc = nlp(patient_notes)
+    doctor_doc = nlp(doctor_notes)
 
-def save_full_transcription_to_firestore(transcript):
-    """Saves the entire transcription session to Firestore."""
-    doc_ref = db.collection("transcriptions").document()
-    data = {
-        "full_transcript": transcript.strip(),  # Remove leading/trailing spaces
-        "timestamp": datetime.now().isoformat()
+    patient_keywords = [ent.text for ent in patient_doc.ents]
+    doctor_keywords = [ent.text for ent in doctor_doc.ents]
+
+    summary = {
+        "meeting_minutes": len(patient_notes.split()) + len(doctor_notes.split()),
+        "patient_concerns": patient_keywords,
+        "doctor_diagnosis": doctor_keywords,
+        "follow_up_required": "yes" if "follow" in doctor_notes.lower() else "no",
+        "prescription_given": any(keyword.lower() in doctor_notes.lower() for keyword in ["medication", "drug", "prescription"]),
     }
-    doc_ref.set(data)  # Save the full transcription as one document
-    print("🟢 Full transcription saved to Firestore.")
+
+    return summary
+
+def save_summary_to_firestore():
+    """Saves the generated summary to Firestore."""
+    summary = generate_meeting_summary()
+    timestamp = datetime.now().isoformat()
+
+    data = {
+        "doctor_notes": " ".join(speaker_transcripts[0]),
+        "patient_notes": " ".join(speaker_transcripts[1]),
+        "summary": summary,
+        "timestamp": timestamp
+    }
+
+    doc_ref = db.collection("meeting_summaries").document()
+    doc_ref.set(data)
+    print("🟢 Meeting summary saved to Firestore.")
 
 def main():
     try:
