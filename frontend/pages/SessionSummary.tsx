@@ -78,7 +78,7 @@ const VisitSummary: React.FC = () => {
       }
     };
 
-    // Real-time listener for the final summary
+    // Real-time listener for final summary
     const finalSummaryRef = doc(db, "final_summary", openAIDocumentId);
     const unsubscribe = onSnapshot(finalSummaryRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -88,7 +88,7 @@ const VisitSummary: React.FC = () => {
     });
 
     fetchData();
-    return () => unsubscribe(); // Cleanup the listener
+    return () => unsubscribe(); // Cleanup listener
   }, []);
 
   const handleAISummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -152,9 +152,18 @@ const VisitSummary: React.FC = () => {
     }
   };
 
+  const handleOpenFinalSummary = () => {
+    if (finalSummary) {
+      const newWindow = window.open("", "_blank");
+      newWindow?.document.write(`<pre>${finalSummary.report}</pre>`);
+    } else {
+      alert("No final summary available.");
+    }
+  };
+
   const handleSendToPatient = () => {
     if (finalSummary) {
-      console.log("Sending the following report to the patient:", finalSummary.report);
+      console.log("Sending report to patient:", finalSummary.report);
       alert("Report sent to the patient!");
     } else {
       alert("No report available to send.");
@@ -164,9 +173,7 @@ const VisitSummary: React.FC = () => {
   const formatKey = (key: string) =>
     key.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
-  if (isLoading) {
-    return <p className="text-center text-gray-500">Loading data, please wait...</p>;
-  }
+  if (isLoading) return <p className="text-center text-gray-500">Loading data...</p>;
 
   return (
     <div className="max-w-4xl mx-auto p-8 bg-white shadow-lg rounded-lg">
@@ -212,31 +219,28 @@ const VisitSummary: React.FC = () => {
         ))}
       </div>
 
-      {finalSummary && (
-        <div className="mb-8">
-          <h3 className="text-xl font-semibold text-green-700">Final Summary</h3>
-          <p className="text-gray-700 mt-2">{finalSummary.report}</p>
-        </div>
-      )}
-
       <div className="flex justify-between mt-8">
         <button
           onClick={isEditing ? handleSaveClick : () => setIsEditing(true)}
-          className={`px-6 py-2 rounded-lg font-semibold text-white ${
-            isEditing ? "bg-blue-600 hover:bg-blue-700" : "bg-yellow-500 hover:bg-yellow-600"
-          }`}
+          className="bg-yellow-500 hover:bg-yellow-600 px-6 py-2 rounded-lg font-semibold text-white"
         >
           {isEditing ? "Save Changes" : "Edit Information"}
         </button>
         <button
           onClick={handleApproveClick}
-          className="px-6 py-2 rounded-lg font-semibold bg-green-500 text-white hover:bg-green-600"
+          className="bg-green-500 hover:bg-green-600 px-6 py-2 rounded-lg font-semibold text-white"
         >
           Approve Summary
         </button>
         <button
+          onClick={handleOpenFinalSummary}
+          className="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-semibold text-white"
+        >
+          View Final Summary
+        </button>
+        <button
           onClick={handleSendToPatient}
-          className="px-6 py-2 rounded-lg font-semibold bg-purple-500 text-white hover:bg-purple-600"
+          className="bg-purple-500 hover:bg-purple-600 px-6 py-2 rounded-lg font-semibold text-white"
         >
           Send to Patient
         </button>
