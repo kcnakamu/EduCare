@@ -3,48 +3,35 @@ import React, { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { db } from "@/lib/firebaseConfig"; // Firestore db
-import { query, where, getDocs, collection } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth"; // Firebase authentication
+import { auth } from "@/lib/firebaseConfig";
 
 export function SigninForm() {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [role, setRole] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
     try {
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("id", "==", id));
-      const querySnapshot = await getDocs(q);
+      const userCredential = await signInWithEmailAndPassword(auth, id, password);
+      const user = userCredential.user;
+      console.log(`Signed in as ${user.email}`);
 
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        const userData = userDoc.data();
-
-        if (userData.password === password) {
-          setRole(userData.role);
-          console.log(`Signed in as ${userData.role}`);
-
-          if (userData.role === "doctor") {
-            console.log("Redirecting to doctor dashboard");
-            // Implement redirection to doctor dashboard
-          } else if (userData.role === "patient") {
-            console.log("Redirecting to patient dashboard");
-            // Implement redirection to patient dashboard
-          }
-        } else {
-          setError("Incorrect password.");
-        }
+      // You can check user roles based on custom claims, Firestore, or elsewhere
+      if (user.email === "doctor@gmail.com") {
+        console.log("Redirecting to doctor dashboard");
+        // Implement redirection to doctor dashboard
+        window.location.href = "/dictation";
       } else {
-        setError("No user found with this ID.");
+        console.log("Redirecting to patient dashboard");
+        //window.location.href = "/patient";
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to log in.");
+      setError("Failed to log in. Please check your credentials.");
     }
   };
 
@@ -52,19 +39,19 @@ export function SigninForm() {
     <div className="flex">
       <div className="items-center justify-center max-w-md w-full mx-auto rounded-lg md:rounded-2xl p-4 pt-8 md:pt-12 md:p-8 shadow-[0_0_15px_5px_#2C514C] bg-white dark:bg-black">
         <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200">
-          Welcome to EduCare !
+          Welcome to EduCare!
         </h2>
         <p className="text-neutral-600 text-sm max-w-sm mt-2 dark:text-neutral-300">
-          Login to the portal to start recording new session
+          Login to the portal to start recording new sessions
         </p>
 
         <form className="my-8" onSubmit={handleSubmit}>
           <LabelInputContainer className="mb-4">
-            <Label htmlFor="id">Doctor/Patient ID</Label>
+            <Label htmlFor="id">Email</Label>
             <Input
               id="id"
-              placeholder="Enter your ID"
-              type="text"
+              placeholder="Enter your email"
+              type="email"
               value={id}
               onChange={(e) => setId(e.target.value)}
             />
