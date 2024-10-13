@@ -20,23 +20,34 @@ interface ParserOutput {
   [key: string]: string[];
 }
 
+interface OpenAISummary {
+  summary: string;
+}
+
 const VisitSummary: React.FC = () => {
   const [summaryData, setSummaryData] = useState<VisitSummaryData | null>(null);
   const [parserData, setParserData] = useState<ParserOutput | null>(null);
+  const [openAISummary, setOpenAISummary] = useState<OpenAISummary | null>(null);
   const [editedData, setEditedData] = useState<VisitSummaryData | null>(null);
   const [editedParserData, setEditedParserData] = useState<ParserOutput | null>(null);
+  const [editedAISummary, setEditedAISummary] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const documentId = "vMGc7EC72SrLODfpYs0i";
+  const summaryDocumentId = "vMGc7EC72SrLODfpYs0i"; 
+  const openAIDocumentId = "test_large"; 
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const docRef = doc(db, "meeting_summaries", documentId);
-        const parserRef = doc(db, "parser_output", documentId);
+        const docRef = doc(db, "meeting_summaries", summaryDocumentId);
+        const parserRef = doc(db, "parser_output", summaryDocumentId);
+        const openAIRef = doc(db, "openai_summary_1", openAIDocumentId);
 
-        const docSnap = await getDoc(docRef);
-        const parserSnap = await getDoc(parserRef);
+        const [docSnap, parserSnap, openAISnap] = await Promise.all([
+          getDoc(docRef),
+          getDoc(parserRef),
+          getDoc(openAIRef),
+        ]);
 
         if (docSnap.exists()) {
           const data = docSnap.data() as VisitSummaryData;
@@ -52,6 +63,14 @@ const VisitSummary: React.FC = () => {
           setEditedParserData(parserData);
         } else {
           console.error("No parser data found!");
+        }
+
+        if (openAISnap.exists()) {
+          const openAISummary = openAISnap.data() as OpenAISummary;
+          setOpenAISummary(openAISummary);
+          setEditedAISummary(openAISummary.summary); // Initialize for editing
+        } else {
+          console.error("No OpenAI summary found!");
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -78,16 +97,23 @@ const VisitSummary: React.FC = () => {
     }
   };
 
+  const handleAISummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedAISummary(e.target.value);
+  };
+
   const handleSaveClick = async () => {
     try {
-      const summaryRef = doc(db, "meeting_summaries", documentId);
-      const parserRef = doc(db, "parser_output", documentId);
+      const summaryRef = doc(db, "meeting_summaries", summaryDocumentId);
+      const parserRef = doc(db, "parser_output", summaryDocumentId);
+      const openAIRef = doc(db, "openai_summary_1", openAIDocumentId);
 
       if (editedData) await updateDoc(summaryRef, editedData);
       if (editedParserData) await updateDoc(parserRef, editedParserData);
+      if (editedAISummary !== null) await updateDoc(openAIRef, { summary: editedAISummary });
 
       setSummaryData(editedData);
       setParserData(editedParserData);
+      setOpenAISummary({ summary: editedAISummary });
       setIsEditing(false);
       alert("Changes saved successfully!");
     } catch (error) {
@@ -98,7 +124,7 @@ const VisitSummary: React.FC = () => {
 
   const handleApproveClick = async () => {
     try {
-      const summaryRef = doc(db, "meeting_summaries", documentId);
+      const summaryRef = doc(db, "meeting_summaries", summaryDocumentId);
       await updateDoc(summaryRef, { approved: true });
 
       setSummaryData((prev) => ({ ...prev!, approved: true }));
@@ -112,10 +138,10 @@ const VisitSummary: React.FC = () => {
   const formatKey = (key: string) =>
     key
       .toLowerCase()
-      .replace(/_/g, " ") // Replace underscores with spaces
-      .replace(/\b\w/g, (char) => char.toUpperCase()); // Capitalize the first letter of each word
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
 
-  if (!summaryData || !parserData) {
+  if (!summaryData || !parserData || !openAISummary) {
     return <p className="text-center text-gray-500">Loading data, please wait...</p>;
   }
 
@@ -125,17 +151,17 @@ const VisitSummary: React.FC = () => {
         Doctor Visit Summary
       </h2>
 
-      {/* Doctor Notes */}
+      {/* AI-Generated Summary */}
       <div className="mb-8">
-        <h3 className="text-xl font-semibold text-blue-700">Doctor's Notes</h3>
+        <h3 className="text-xl font-semibold text-blue-700">AI-Generated Summary</h3>
         {isEditing ? (
           <textarea
             className="w-full border p-3 mt-2 rounded"
-            value={editedData?.doctor_notes || ""}
-            onChange={(e) => handleChange(e, "doctor_notes")}
+            value={editedAISummary || ""}
+            onChange={handleAISummaryChange}
           />
         ) : (
-          <p className="text-gray-700 mt-2">{summaryData.doctor_notes}</p>
+          <p className="text-gray-700 mt-2">{openAISummary.summary}</p>
         )}
       </div>
 
