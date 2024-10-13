@@ -39,7 +39,7 @@ const VisitSummary: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const summaryDocumentId = "vMGc7EC72SrLODfpYs0i";
+  const summaryDocumentId = "test_large";
   const openAIDocumentId = "test_large";
 
   useEffect(() => {

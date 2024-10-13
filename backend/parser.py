@@ -68,7 +68,8 @@ def fetch_notes_from_firestore(document_id):
 
     if doc.exists:
         data = doc.to_dict()
-        return data.get("doctor_notes", ""), data.get("patient_notes", "")
+        # print(d)
+        return data.get("transcription")
     else:
         raise ValueError("No such document found!")
 
@@ -80,14 +81,13 @@ def save_to_firestore(data, document_id):
     doc_ref.set(data)  # Save data to Firestore
 
 if __name__ == "__main__":  
-    document_id = "vMGc7EC72SrLODfpYs0i"  # Replace with your Firestore document ID
+    document_id = "test_large"  # Replace with your Firestore document ID
 
     # Fetch the notes from Firestore
-    doctor_notes, patient_notes = fetch_notes_from_firestore(document_id)
-
-    # Combine notes and process them
-    combined_notes = doctor_notes + " " + patient_notes
-    tokens = tokenize(combined_notes)  # Ensure tokenize is called correctly
+    transcription = fetch_notes_from_firestore(document_id)
+    # print(doctor_notes,patient_notes)
+    # Combine notranscrtes and process them
+    tokens = tokenize(transcription)  # Ensure tokenize is called correctly
     tokens_with_icd = add_icd(tokens)  # Augment tokens with ICD-10 codes
 
     print(tokens_with_icd)  # Output the processed result
