@@ -82,24 +82,25 @@ const ReportDropdown = () => {
 
   return (
     <div className="p-6 bg-gradient-to-r from-blue-100 to-blue-200 shadow-md rounded-lg max-w-4xl mx-auto">
-      <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">
-        Select a Previous Appointment
-      </h2>
+      <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">Select a Previous Appointment</h2>
 
       <div className="mb-6">
         <select
-          value={selectedReport}
+          value={selectedReport} // Value is an empty string initially
           onChange={handleDropdownChange}
           className="w-full p-4 border rounded-lg text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="" disabled>
             Select an appointment
           </option>
-          {appointments.map((appointment) => (
-            <option key={appointment.id} value={appointment.id}>
-              {`Appointment - ${new Date(appointment.timestamp).toLocaleDateString()}`}
-            </option>
-          ))}
+          {/* Hardcoded names with Firestore document ID values */}
+          {appointments.length > 0 && (
+            <>
+              <option value={appointments[0].id}>Dr. Smith - Appointment 10/24</option>
+              <option value={appointments[1].id}>Dr. Smith - Appointment 09/24</option>
+              <option value={appointments[2].id}>Dr. Smith - Appointment 08/24</option>
+            </>
+          )}
         </select>
       </div>
 
