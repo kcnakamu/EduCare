@@ -24,10 +24,10 @@ export function SigninForm() {
       if (user.email === "doctor@gmail.com") {
         console.log("Redirecting to doctor dashboard");
         // Implement redirection to doctor dashboard
-        window.location.href = "/dictation";
+        window.location.href = "/doctor";
       } else {
         console.log("Redirecting to patient dashboard");
-        //window.location.href = "/patient";
+        window.location.href = "/patient";
       }
     } catch (err) {
       console.error(err);

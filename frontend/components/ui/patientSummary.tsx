@@ -8,9 +8,20 @@ import ImmunizationsSection from "@/components/ui/immunizationsSection";
 import SocialHistorySection from "@/components/ui/socialHistorySection";
 import VitalSignsSection from "@/components/ui/vitalSignsSection";
 import LanguageSection from "@/components/ui/languageSection";
+import { MultiStepLoader } from "@/components/ui/multi-step-loader"; // Import the multi-step-loader component
+
+const loadingStates = [
+  { text: "Connecting to out genius model..." },
+  { text: "Processing your appointment details..." },
+  { text: "Validating your converstaion for clarity..." },
+  { text: "Creating a trusted summary for records... " },
+  { text: "Using ICD codes to have a trusted diagnosis..." },
+  { text: "Just a moment while we compile your notes..." },
+  { text: "Loading your appointment summary for review..." },
+];
 
 // Modal Component
-const Modal = ({ isVisible, onClose, children }: { isVisible: boolean, onClose: () => void, children: React.ReactNode }) => {
+const Modal = ({ isVisible, onClose }: { isVisible: boolean, onClose: () => void }) => {
   if (!isVisible) return null;
 
   return (
@@ -19,7 +30,10 @@ const Modal = ({ isVisible, onClose, children }: { isVisible: boolean, onClose: 
         <button style={modalStyles.closeButton} onClick={onClose}>
           X
         </button>
-        <div>{children}</div>
+        <div>
+          <h3>Recording in Progress...</h3>
+          <p>Click "X" to stop recording.</p>
+        </div>
       </div>
     </div>
   );
@@ -95,18 +109,38 @@ const fetchPatientData = async () => {
 
 const PatientSummary = () => {
   const [patient, setPatient] = useState<any | null>(null);
-  const [isModalVisible, setModalVisible] = useState(false);
+  const [isModalVisible, setModalVisible] = useState(false); // For modal visibility
+  const [loading, setLoading] = useState(false); // For loader
+  const [currentState, setCurrentState] = useState(0); // Track current state of the loader
 
   useEffect(() => {
     fetchPatientData().then(setPatient);
   }, []);
 
+  // UseEffect to handle the redirection after the loader finishes
+  useEffect(() => {
+    if (loading) {
+      if (currentState >= loadingStates.length - 1) {
+        setTimeout(() => {
+          setLoading(false);
+          window.location.href = "/summary"; // Redirect after loader finishes
+        }, 2000); // Small delay to allow the last state to complete
+      } else {
+        const timeout = setTimeout(() => {
+          setCurrentState((prev) => prev + 1);
+        }, 2000); // Update the state every 2 seconds (duration)
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [loading, currentState]);
+
   const openModal = () => {
     setModalVisible(true);
   };
 
-  const closeModal = () => {
+  const closeModalAndStartLoader = () => {
     setModalVisible(false);
+    setLoading(true); // Start the loader when modal closes
   };
 
   if (!patient) return <p>Loading...</p>;
@@ -157,17 +191,22 @@ const PatientSummary = () => {
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
             }}
-            onClick={openModal} // Trigger modal on click
+            onClick={openModal} // Open modal on click
           >
             <span className="text-black">RECORD!</span>
           </button>
         </div>
 
         {/* Modal */}
-        <Modal isVisible={isModalVisible} onClose={closeModal}>
-          <h3>Recording in Progress...</h3>
-          <p>Recording patient's summary. Click "X" to stop.</p>
-        </Modal>
+        <Modal isVisible={isModalVisible} onClose={closeModalAndStartLoader} />
+
+        {/* Multi-step Loader */}
+        <MultiStepLoader
+          loadingStates={loadingStates}
+          loading={loading}
+          duration={2000} // Step duration in milliseconds
+          loop={false} // Disable looping to prevent restarting
+        />
       </div>
     </div>
   );
