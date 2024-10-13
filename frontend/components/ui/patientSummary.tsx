@@ -9,7 +9,7 @@ import SocialHistorySection from "@/components/ui/socialHistorySection";
 import VitalSignsSection from "@/components/ui/vitalSignsSection";
 import LanguageSection from "@/components/ui/languageSection";
 import { MultiStepLoader } from "@/components/ui/multi-step-loader"; // Import the multi-step-loader component
-
+import { RecordBackground } from "@/components/ui/recordBackground";
 const loadingStates = [
   { text: "Connecting to out genius model..." },
   { text: "Processing your appointment details..." },
@@ -30,14 +30,47 @@ const Modal = ({ isVisible, onClose }: { isVisible: boolean, onClose: () => void
         <button style={modalStyles.closeButton} onClick={onClose}>
           X
         </button>
-        <div>
-          <h3>Recording in Progress...</h3>
-          <p>Click "X" to stop recording.</p>
+        <div className="flex flex-col">
+          <h3 style={{ marginBottom: '20px' }}>Recording in Progress...</h3>
+
+         {/* Record Background Waves Below */}
+         <div style={{ position: "relative", height: "150px", width: "100%", overflow: "hidden" }}>
+            <RecordBackground waveWidth={50} backgroundFill="transparent" blur={10} waveOpacity={0.5} />
+          </div>
+
+          {/* Red Circular Button with Stop Text */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+            <button
+              style={{
+                width: "100px",
+                height: "100px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, rgba(255, 0, 0, 0.7), rgba(255, 0, 0, 0.3))",
+                border: "none",
+                boxShadow: "0 4px 15px rgba(255, 0, 0, 0.5)",
+                color: "white",
+                fontSize: "18px",
+                cursor: "pointer",
+                transition: "transform 0.2s ease-in-out",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              onClick={onClose} // Stop recording on click
+            >
+              Stop
+            </button>
+          </div>
+          <p>Click "Stop" to end the recording.</p>
         </div>
       </div>
     </div>
   );
 };
+
 
 const modalStyles = {
   overlay: {

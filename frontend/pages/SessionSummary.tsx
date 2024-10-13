@@ -155,11 +155,46 @@ const VisitSummary: React.FC = () => {
   const handleOpenFinalSummary = () => {
     if (finalSummary) {
       const newWindow = window.open("", "_blank");
-      newWindow?.document.write(`<pre>${finalSummary.report}</pre>`);
+      const formattedSummary = finalSummary.report
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Makes text between ** bold
+        .replace(/\n/g, "<br>"); // Preserves newlines
+  
+      const summaryContent = `
+        <html>
+          <head>
+            <title>Final Summary</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                line-height: 1.6;
+              }
+              h2 {
+                color: #4A90E2;
+              }
+              p {
+                font-size: 16px;
+              }
+              strong {
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Final Doctor Visit Summary</h2>
+            <p><strong>Generated on:</strong> ${finalSummary.timestamp}</p>
+            <p>${formattedSummary}</p>
+          </body>
+        </html>
+      `;
+  
+      newWindow?.document.write(summaryContent);
+      newWindow?.document.close(); // Ensures the content gets written
     } else {
       alert("No final summary available.");
     }
   };
+  
 
   const handleSendToPatient = () => {
     if (finalSummary) {
