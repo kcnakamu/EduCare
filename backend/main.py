@@ -1,3 +1,5 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS to handle cross-origin requests
 import pyaudio
 import asyncio
 import json
@@ -8,7 +10,12 @@ from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
 import spacy
-from nltk.tokenize import sent_tokenize
+from threading import Thread
+
+app = Flask(__name__)
+
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+
 
 # Load scispaCy model for medical NLP
 nlp = spacy.load("en_core_sci_sm")
@@ -25,71 +32,70 @@ cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Configuration
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 16000
-CHUNK = 8000
-audio_queue = asyncio.Queue()
-
-# Initialize variables
-speaker_transcripts = {0: [], 1: []}  # Track doctor and patient notes by speaker ID
+is_recording = False  # To track recording state
+audio_queue = asyncio.Queue()  # Queue for audio streaming
+speaker_transcripts = {0: [], 1: []}  # Track transcripts by speaker
 
 def mic_callback(input_data, frame_count, time_info, status_flag):
     """Handles microphone data streaming."""
     audio_queue.put_nowait(input_data)
     return (input_data, pyaudio.paContinue)
 
+@app.route('/start', methods=['POST'])
+def start_recording():
+    """Start recording."""
+    global is_recording
+    if not is_recording:
+        is_recording = True
+        Thread(target=run_recording).start()
+        return jsonify({"message": "Recording started."}), 200
+    return jsonify({"error": "Recording already in progress."}), 400
+
+@app.route('/stop', methods=['POST'])
+def stop_recording():
+    """Stop recording and save transcript."""
+    global is_recording
+    if is_recording:
+        is_recording = False
+        save_summary_to_firestore()  # Save the transcript
+        return jsonify({"message": "Recording stopped and transcript saved."}), 200
+    return jsonify({"error": "No recording in progress."}), 400
+
+def run_recording():
+    """Run the recording process."""
+    loop = asyncio.new_event_loop()  # Create a new event loop for the thread
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run())  # Run the recording coroutine
+
 async def run():
-    """Establishes connection with Deepgram and streams microphone data."""
+    """Stream audio data to Deepgram API."""
     url = "wss://api.deepgram.com/v1/listen?diarize=true&punctuate=true&encoding=linear16&sample_rate=16000"
     headers = {"Authorization": f"Token {API_KEY}"}
 
     async with websockets.connect(url, extra_headers=headers) as ws:
-        print("🟢 Successfully opened Deepgram streaming connection.")
+        print("🟢 Connected to Deepgram.")
 
         async def sender():
-            """Streams audio data from the microphone."""
+            """Send audio data."""
             try:
-                while True:
+                while is_recording:
                     mic_data = await audio_queue.get()
                     await ws.send(mic_data)
             except websockets.exceptions.ConnectionClosedOK:
                 await ws.send(json.dumps({"type": "CloseStream"}))
                 print("🟢 Closed Deepgram connection.")
-            except Exception as e:
-                print(f"Error during streaming: {e}")
 
         async def receiver():
-            """Receives and prints transcription results."""
+            """Receive transcription results."""
             async for msg in ws:
                 res = json.loads(msg)
                 if res.get("is_final"):
                     process_transcription(res)
 
-        async def microphone():
-            """Captures microphone input."""
-            audio = pyaudio.PyAudio()
-            stream = audio.open(
-                format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                input=True,
-                frames_per_buffer=CHUNK,
-                stream_callback=mic_callback,
-            )
-            stream.start_stream()
-
-            while stream.is_active():
-                await asyncio.sleep(0.1)
-
-            stream.stop_stream()
-            stream.close()
-
-        await asyncio.gather(microphone(), sender(), receiver())
+        await asyncio.gather(sender(), receiver())
 
 def process_transcription(res):
-    """Processes and categorizes the transcription by speaker."""
+    """Process transcription results."""
     words = res["channel"]["alternatives"][0].get("words", [])
     for word_info in words:
         speaker = word_info.get("speaker", "unknown")
@@ -97,74 +103,41 @@ def process_transcription(res):
         speaker_transcripts[speaker].append(word)
 
         if "goodbye" in word.lower():
-            print("🟢 'Goodbye' detected. Saving final transcript.")
+            print("🟢 'Goodbye' detected. Saving transcript.")
             save_summary_to_firestore()
 
 def generate_meeting_summary():
-    """Generates a structured summary from the meeting."""
-    # Extract key medical terms using scispaCy
+    """Generate meeting summary."""
     patient_notes = " ".join(speaker_transcripts[1])
     doctor_notes = " ".join(speaker_transcripts[0])
 
-    patient_doc = nlp(patient_notes)
-    doctor_doc = nlp(doctor_notes)
+    patient_keywords = [ent.text for ent in nlp(patient_notes).ents]
+    doctor_keywords = [ent.text for ent in nlp(doctor_notes).ents]
 
-    patient_keywords = [ent.text for ent in patient_doc.ents]
-    doctor_keywords = [ent.text for ent in doctor_doc.ents]
-
-    # Generate a concise summary using extracted keywords and sentences
-    summary_sentences = []
-    if patient_keywords:
-        summary_sentences.append(
-            f"The patient reported the following concerns: {', '.join(patient_keywords)}."
-        )
-    if doctor_keywords:
-        summary_sentences.append(
-            f"The doctor diagnosed the following: {', '.join(doctor_keywords)}."
-        )
-    if "follow" in doctor_notes.lower():
-        summary_sentences.append("The patient was advised to follow up.")
-    if any(
-        keyword in doctor_notes.lower()
-        for keyword in ["medication", "drug", "prescription"]
-    ):
-        summary_sentences.append("A prescription was provided.")
-
-    concise_summary = " ".join(summary_sentences)
     return {
         "meeting_minutes": len(patient_notes.split()) + len(doctor_notes.split()),
         "patient_concerns": patient_keywords,
         "doctor_diagnosis": doctor_keywords,
-        "concise_summary": concise_summary,
         "follow_up_required": "yes" if "follow" in doctor_notes.lower() else "no",
-        "prescription_given": any(
-            keyword in doctor_notes.lower()
-            for keyword in ["medication", "drug", "prescription"]
-        ),
+        "concise_summary": " ".join([
+            f"Patient reported: {', '.join(patient_keywords)}.",
+            f"Doctor diagnosed: {', '.join(doctor_keywords)}."
+        ]),
     }
 
 def save_summary_to_firestore():
-    """Saves the generated summary to Firestore."""
+    """Save summary to Firestore."""
     summary = generate_meeting_summary()
     timestamp = datetime.now().isoformat()
-
     data = {
         "doctor_notes": " ".join(speaker_transcripts[0]),
         "patient_notes": " ".join(speaker_transcripts[1]),
         "summary": summary,
         "timestamp": timestamp,
     }
+    db.collection("meeting_summaries").document().set(data)
+    print("🟢 Summary saved to Firestore.")
 
-    doc_ref = db.collection("meeting_summaries").document()
-    doc_ref.set(data)
-    print("🟢 Meeting summary saved to Firestore.")
-
-def main():
-    try:
-        print("🎤 Starting microphone stream...")
-        asyncio.run(run())
-    except Exception as e:
-        print(f"🔴 ERROR: {e}")
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    print("🎤 Starting Flask server...")
+    app.run(host='0.0.0.0', port=5000)
