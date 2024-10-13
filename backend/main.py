@@ -12,6 +12,7 @@ from firebase_admin import credentials, firestore
 import spacy
 from threading import Thread
 from context import generate_report  # Import generate_report from context.py
+from translate import translate
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
@@ -23,6 +24,34 @@ load_dotenv()
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+@app.route('/translate', methods=['POST'])
+def translate_report():
+    """Translate a report to the specified language and save it in Firestore."""
+    try:
+        data = request.get_json()
+        document_id = data.get("document_id")
+        language = data.get("language")
+
+        if not document_id or not language:
+            raise ValueError("Missing document_id or language in request.")
+
+        # Perform translation
+        translated_text = translate(document_id, language)
+
+        # Save the translated report to Firestore
+        translated_ref = db.collection("translated_report").document(document_id)
+        translated_ref.set({
+            "report": translated_text,
+            "timestamp": firestore.SERVER_TIMESTAMP
+        })
+
+        print(f"🟢 Translated report saved to Firestore for document ID: {document_id}")
+        return jsonify({"translated_report": translated_text}), 200
+
+    except Exception as e:
+        print(f"🔴 Error translating report: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/generate-report', methods=['POST'])
 def generate_final_report():
