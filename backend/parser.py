@@ -5,7 +5,7 @@ from google.oauth2 import service_account
 
 # Use the absolute path to the service account key JSON file
 credentials = service_account.Credentials.from_service_account_file(
-    "/Users/siddharthareddy/Desktop/Developer/EduCare/EduCare/backend/serviceAccountKey.json"
+    "/Users/aquachat77/Documents/HackHarv/serviceAccountKey.json"
 )
 
 # Initialize Firestore client with credentials
@@ -79,7 +79,7 @@ def save_to_firestore(data, document_id):
     doc_ref = db.collection("parser_output").document(document_id)
     doc_ref.set(data)  # Save data to Firestore
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
     document_id = "vMGc7EC72SrLODfpYs0i"  # Replace with your Firestore document ID
 
     # Fetch the notes from Firestore
