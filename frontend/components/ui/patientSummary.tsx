@@ -9,6 +9,56 @@ import SocialHistorySection from "@/components/ui/socialHistorySection";
 import VitalSignsSection from "@/components/ui/vitalSignsSection";
 import LanguageSection from "@/components/ui/languageSection";
 
+// Modal Component
+const Modal = ({ isVisible, onClose, children }: { isVisible: boolean, onClose: () => void, children: React.ReactNode }) => {
+  if (!isVisible) return null;
+
+  return (
+    <div style={modalStyles.overlay}>
+      <div style={modalStyles.modal}>
+        <button style={modalStyles.closeButton} onClick={onClose}>
+          X
+        </button>
+        <div>{children}</div>
+      </div>
+    </div>
+  );
+};
+
+const modalStyles = {
+  overlay: {
+    position: "fixed" as "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: "#fff",
+    padding: "20px",
+    borderRadius: "8px",
+    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1)",
+    position: "relative" as "relative",
+    maxWidth: "500px",
+    width: "100%",
+    textAlign: "center" as "center",
+  },
+  closeButton: {
+    position: "absolute" as "absolute",
+    top: "10px",
+    right: "10px",
+    background: "none",
+    border: "none",
+    fontSize: "18px",
+    cursor: "pointer",
+  },
+};
+
 const fetchPatientData = async () => {
   return {
     id: 1,
@@ -45,36 +95,18 @@ const fetchPatientData = async () => {
 
 const PatientSummary = () => {
   const [patient, setPatient] = useState<any | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isModalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     fetchPatientData().then(setPatient);
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const response = await fetch("http://localhost:5000/start", { method: "POST" });
-      if (response.ok) {
-        setIsRecording(true);
-        alert("Recording started...");
-      }
-    } catch (error) {
-      console.error("Failed to start recording:", error);
-      alert("Error starting the recording.");
-    }
+  const openModal = () => {
+    setModalVisible(true);
   };
 
-  const stopRecording = async () => {
-    try {
-      const response = await fetch("http://localhost:5000/stop", { method: "POST" });
-      if (response.ok) {
-        setIsRecording(false);
-        alert("Recording stopped and transcript saved successfully.");
-      }
-    } catch (error) {
-      console.error("Failed to stop recording:", error);
-      alert("Error stopping the recording.");
-    }
+  const closeModal = () => {
+    setModalVisible(false);
   };
 
   if (!patient) return <p>Loading...</p>;
@@ -104,16 +136,14 @@ const PatientSummary = () => {
         <VitalSignsSection vitalSigns={patient.vitalSigns} />
         <LanguageSection languages={patient.languages} />
 
+        {/* Circular Button with Greenish Wave Color */}
         <div style={{ display: "flex", justifyContent: "center", marginTop: "20px" }}>
           <button
-            onClick={isRecording ? stopRecording : startRecording}
             style={{
               width: "100px",
               height: "100px",
               borderRadius: "50%",
-              background: isRecording
-                ? "linear-gradient(135deg, rgba(255, 0, 0, 0.7), rgba(255, 0, 0, 0.3))"
-                : "linear-gradient(135deg, rgba(0, 204, 0, 0.7), rgba(0, 204, 0, 0.3))",
+              background: "linear-gradient(135deg, rgba(0, 204, 0, 0.7), rgba(0, 204, 0, 0.3))",
               border: "none",
               boxShadow: "0 4px 15px rgba(0, 204, 0, 0.5)",
               color: "white",
@@ -121,10 +151,23 @@ const PatientSummary = () => {
               cursor: "pointer",
               transition: "transform 0.2s ease-in-out",
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+            onClick={openModal} // Trigger modal on click
           >
-            {isRecording ? "STOP" : "RECORD"}
+            <span className="text-black">RECORD!</span>
           </button>
         </div>
+
+        {/* Modal */}
+        <Modal isVisible={isModalVisible} onClose={closeModal}>
+          <h3>Recording in Progress...</h3>
+          <p>Recording patient's summary. Click "X" to stop.</p>
+        </Modal>
       </div>
     </div>
   );
