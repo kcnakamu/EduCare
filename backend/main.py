@@ -11,17 +11,59 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import spacy
 from threading import Thread
+from context import generate_report  # Import generate_report from context.py
 
 app = Flask(__name__)
-
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
+# Load environment variables
+load_dotenv()
+
+# Initialize Firebase
+cred = credentials.Certificate("serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+@app.route('/generate-report', methods=['POST'])
+def generate_final_report():
+    """
+    Generate the final report and save it in Firestore.
+    """
+    try:
+        data = request.get_json()
+        print(f"📥 Received request data: {data}")
+
+        summary_id = data.get('summary_id')
+        parser_id = data.get('parser_id')
+
+        if not summary_id or not parser_id:
+            raise ValueError("Missing summary_id or parser_id in request.")
+
+        # Generate the report using the function from context.py
+        report = generate_report(summary_id, parser_id)
+
+        # Save the report to Firestore
+        final_summary_ref = db.collection("final_summary").document(summary_id)
+        final_summary_ref.set({
+            "report": report,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+        })
+
+        print("🟢 Report successfully saved to Firestore.")
+        return jsonify({"message": "Report generated and saved successfully.", "report": report}), 200
+
+    except Exception as e:
+        print(f"🔴 Error generating report: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+if __name__ == '__main__':
+    print("🎤 Starting Flask server...")
+    app.run(host='0.0.0.0', port=5000)
 
 # Load scispaCy model for medical NLP
 nlp = spacy.load("en_core_sci_sm")
 
 # Load environment variables from .env file
-load_dotenv()
 API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 if not API_KEY:
@@ -138,6 +180,3 @@ def save_summary_to_firestore():
     db.collection("meeting_summaries").document().set(data)
     print("🟢 Summary saved to Firestore.")
 
-if __name__ == '__main__':
-    print("🎤 Starting Flask server...")
-    app.run(host='0.0.0.0', port=5000)

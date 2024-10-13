@@ -5,7 +5,7 @@ from google.oauth2 import service_account
 
 # Use the absolute path to the service account key JSON file
 credentials = service_account.Credentials.from_service_account_file(
-    "/Users/aquachat77/Documents/HackHarv/serviceAccountKey.json"
+    "/Users/siddharthareddy/Desktop/Developer/EduCare/EduCare/backend/serviceAccountKey.json"
 )
 
 # Initialize Firestore client with credentials

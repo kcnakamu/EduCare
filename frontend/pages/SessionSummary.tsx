@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebaseConfig";
 
 interface VisitSummaryData {
@@ -24,17 +24,23 @@ interface OpenAISummary {
   summary: string;
 }
 
+interface FinalSummary {
+  report: string;
+  timestamp: string;
+}
+
 const VisitSummary: React.FC = () => {
   const [summaryData, setSummaryData] = useState<VisitSummaryData | null>(null);
   const [parserData, setParserData] = useState<ParserOutput | null>(null);
   const [openAISummary, setOpenAISummary] = useState<OpenAISummary | null>(null);
-  const [editedData, setEditedData] = useState<VisitSummaryData | null>(null);
+  const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null); // Final summary state
   const [editedParserData, setEditedParserData] = useState<ParserOutput | null>(null);
   const [editedAISummary, setEditedAISummary] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const summaryDocumentId = "vMGc7EC72SrLODfpYs0i"; 
-  const openAIDocumentId = "test_large"; 
+  const summaryDocumentId = "vMGc7EC72SrLODfpYs0i";
+  const openAIDocumentId = "test_large";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,41 +58,41 @@ const VisitSummary: React.FC = () => {
         if (docSnap.exists()) {
           const data = docSnap.data() as VisitSummaryData;
           setSummaryData(data);
-          setEditedData(data);
-        } else {
-          console.error("No summary data found!");
         }
 
         if (parserSnap.exists()) {
           const parserData = parserSnap.data() as ParserOutput;
           setParserData(parserData);
           setEditedParserData(parserData);
-        } else {
-          console.error("No parser data found!");
         }
 
         if (openAISnap.exists()) {
           const openAISummary = openAISnap.data() as OpenAISummary;
           setOpenAISummary(openAISummary);
-          setEditedAISummary(openAISummary.summary); // Initialize for editing
-        } else {
-          console.error("No OpenAI summary found!");
+          setEditedAISummary(openAISummary.summary);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
+    // Real-time listener for the final summary
+    const finalSummaryRef = doc(db, "final_summary", openAIDocumentId);
+    const unsubscribe = onSnapshot(finalSummaryRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as FinalSummary;
+        setFinalSummary(data);
+      }
+    });
+
     fetchData();
+    return () => unsubscribe(); // Cleanup the listener
   }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,
-    field: keyof VisitSummaryData
-  ) => {
-    if (editedData) {
-      setEditedData({ ...editedData, [field]: e.target.value });
-    }
+  const handleAISummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedAISummary(e.target.value);
   };
 
   const handleParserChange = (key: string, index: number, value: string) => {
@@ -97,23 +103,20 @@ const VisitSummary: React.FC = () => {
     }
   };
 
-  const handleAISummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedAISummary(e.target.value);
-  };
-
   const handleSaveClick = async () => {
     try {
-      const summaryRef = doc(db, "meeting_summaries", summaryDocumentId);
       const parserRef = doc(db, "parser_output", summaryDocumentId);
       const openAIRef = doc(db, "openai_summary_1", openAIDocumentId);
 
-      if (editedData) await updateDoc(summaryRef, editedData);
-      if (editedParserData) await updateDoc(parserRef, editedParserData);
-      if (editedAISummary !== null) await updateDoc(openAIRef, { summary: editedAISummary });
+      if (editedParserData) {
+        await updateDoc(parserRef, editedParserData);
+        setParserData(editedParserData);
+      }
+      if (editedAISummary !== null) {
+        await updateDoc(openAIRef, { summary: editedAISummary });
+        setOpenAISummary({ summary: editedAISummary });
+      }
 
-      setSummaryData(editedData);
-      setParserData(editedParserData);
-      setOpenAISummary({ summary: editedAISummary });
       setIsEditing(false);
       alert("Changes saved successfully!");
     } catch (error) {
@@ -124,24 +127,44 @@ const VisitSummary: React.FC = () => {
 
   const handleApproveClick = async () => {
     try {
-      const summaryRef = doc(db, "meeting_summaries", summaryDocumentId);
-      await updateDoc(summaryRef, { approved: true });
+      const response = await fetch("http://localhost:5000/generate-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary_id: openAIDocumentId,
+          parser_id: summaryDocumentId,
+        }),
+      });
 
-      setSummaryData((prev) => ({ ...prev!, approved: true }));
-      alert("Summary approved successfully!");
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Report generated:", data.report);
+        alert("Summary approved and report generated successfully!");
+      } else {
+        console.error("Failed to generate report:", response.statusText);
+        alert("Failed to generate report. Please try again.");
+      }
     } catch (error) {
       console.error("Error approving summary:", error);
       alert("Failed to approve summary. Please try again.");
     }
   };
 
-  const formatKey = (key: string) =>
-    key
-      .toLowerCase()
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+  const handleSendToPatient = () => {
+    if (finalSummary) {
+      console.log("Sending the following report to the patient:", finalSummary.report);
+      alert("Report sent to the patient!");
+    } else {
+      alert("No report available to send.");
+    }
+  };
 
-  if (!summaryData || !parserData || !openAISummary) {
+  const formatKey = (key: string) =>
+    key.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+
+  if (isLoading) {
     return <p className="text-center text-gray-500">Loading data, please wait...</p>;
   }
 
@@ -151,7 +174,6 @@ const VisitSummary: React.FC = () => {
         Doctor Visit Summary
       </h2>
 
-      {/* AI-Generated Summary */}
       <div className="mb-8">
         <h3 className="text-xl font-semibold text-blue-700">AI-Generated Summary</h3>
         {isEditing ? (
@@ -161,14 +183,13 @@ const VisitSummary: React.FC = () => {
             onChange={handleAISummaryChange}
           />
         ) : (
-          <p className="text-gray-700 mt-2">{openAISummary.summary}</p>
+          <p className="text-gray-700 mt-2">{openAISummary?.summary}</p>
         )}
       </div>
 
-      {/* Parser Output */}
       <div className="mb-8">
         <h3 className="text-xl font-semibold text-blue-700">Extracted Information</h3>
-        {Object.entries(parserData).map(([key, values], index) => (
+        {Object.entries(parserData || {}).map(([key, values], index) => (
           <div key={index} className="mb-4">
             <h4 className="text-lg font-medium text-gray-800">{formatKey(key)}</h4>
             {isEditing ? (
@@ -191,7 +212,13 @@ const VisitSummary: React.FC = () => {
         ))}
       </div>
 
-      {/* Save, Edit, and Approve Buttons */}
+      {finalSummary && (
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-green-700">Final Summary</h3>
+          <p className="text-gray-700 mt-2">{finalSummary.report}</p>
+        </div>
+      )}
+
       <div className="flex justify-between mt-8">
         <button
           onClick={isEditing ? handleSaveClick : () => setIsEditing(true)}
@@ -206,6 +233,12 @@ const VisitSummary: React.FC = () => {
           className="px-6 py-2 rounded-lg font-semibold bg-green-500 text-white hover:bg-green-600"
         >
           Approve Summary
+        </button>
+        <button
+          onClick={handleSendToPatient}
+          className="px-6 py-2 rounded-lg font-semibold bg-purple-500 text-white hover:bg-purple-600"
+        >
+          Send to Patient
         </button>
       </div>
     </div>
