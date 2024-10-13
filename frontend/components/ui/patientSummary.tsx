@@ -146,7 +146,7 @@ const PatientSummary = () => {
   if (!patient) return <p>Loading...</p>;
 
   return (
-    <div style={{ padding: "40px", backgroundColor: "#f4f7f9", minHeight: "100vh" }}>
+    <div style={{ padding: "20px", backgroundColor: "#f4f7f9", minHeight: "100vh", minWidth: "130vh"  }}>
       <div
         style={{
           padding: "20px",
