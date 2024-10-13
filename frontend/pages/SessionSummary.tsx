@@ -159,34 +159,110 @@ const VisitSummary: React.FC = () => {
         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Makes text between ** bold
         .replace(/\n/g, "<br>"); // Preserves newlines
   
-      const summaryContent = `
-        <html>
-          <head>
-            <title>Final Summary</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                margin: 20px;
-                line-height: 1.6;
-              }
-              h2 {
-                color: #4A90E2;
-              }
-              p {
-                font-size: 16px;
-              }
-              strong {
-                font-weight: bold;
-              }
-            </style>
-          </head>
-          <body>
-            <h2>Final Doctor Visit Summary</h2>
-            <p><strong>Generated on:</strong> ${finalSummary.timestamp}</p>
-            <p>${formattedSummary}</p>
-          </body>
-        </html>
-      `;
+        const summaryContent = `
+      <html>
+        <head>
+          <title>Final Summary</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              background-color: #f0f8ff;
+              padding: 20px;
+              color: #333;
+            }
+            .container {
+              max-width: 800px;
+              margin: 20px auto;
+              background-color: #ffffff;
+              padding: 20px;
+              border-radius: 12px;
+              box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+              border-left: 6px solid #4a90e2;
+            }
+            h2 {
+              color: #4a90e2;
+              margin-bottom: 20px;
+              font-size: 24px;
+            }
+            p {
+              color: #7f8c8d;
+              line-height: 1.6;
+              margin-bottom: 20px;
+              font-size: 16px;
+            }
+            .section {
+              margin-bottom: 30px;
+            }
+            strong {
+              font-weight: bold;
+              color: #333;
+            }
+            .icon {
+              width: 20px;
+              vertical-align: middle;
+              margin-right: 8px;
+            }
+            .header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #e0e0e0;
+              margin-bottom: 20px;
+            }
+            .doctor-notes, .prescription, .advice {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 15px;
+              border: 1px solid #d9d9d9;
+            }
+            .section-header {
+              font-size: 18px;
+              font-weight: 600;
+              color: #2c3e50;
+              margin-bottom: 10px;
+              display: flex;
+              align-items: center;
+            }
+            .timestamp {
+              font-size: 14px;
+              color: #7f8c8d;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>Doctor Visit Summary</h2>
+              <p class="timestamp"><strong>Generated on:</strong> ${finalSummary.timestamp}</p>
+            </div>
+            
+            <div class="section doctor-notes">
+              <div class="section-header">
+                Doctor's Notes
+              </div>
+              <p>${formattedSummary}</p>
+            </div>
+
+            <div class="section prescription">
+              <div class="section-header">
+                <img class="icon" src="https://img.icons8.com/ios-filled/50/000000/pill.png" alt="pill icon">
+                Prescription
+              </div>
+              <p>No new prescriptions for this visit.</p>
+            </div>
+
+            <div class="section advice">
+              <div class="section-header">
+                <img class="icon" src="https://img.icons8.com/ios-filled/50/000000/stethoscope.png" alt="stethoscope icon">
+                Additional Advice
+              </div>
+              <p>Follow-up in 2 weeks for a blood pressure check-up.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
   
       newWindow?.document.write(summaryContent);
       newWindow?.document.close(); // Ensures the content gets written
