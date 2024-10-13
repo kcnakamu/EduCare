@@ -78,6 +78,36 @@ const PatientSummary = () => {
         <SocialHistorySection {...patient.socialHistory} />
         <VitalSignsSection vitalSigns={patient.vitalSigns} />
         <LanguageSection languages={patient.languages} /> 
+
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          marginTop: '20px' 
+        }}>
+          <button
+            style={{
+              width: '100px',
+              height: '100px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(0, 204, 0, 0.7), rgba(0, 204, 0, 0.3))', // Greenish gradient
+              border: 'none',
+              boxShadow: '0 4px 15px rgba(0, 204, 0, 0.5)',
+              color: 'white',
+              fontSize: '18px',
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease-in-out',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onClick={() => console.log("Circular button clicked!")}
+          >
+            <span className="text-black">RECORD!</span>
+          </button>
+        </div>
       </div>
     </div>
   );
