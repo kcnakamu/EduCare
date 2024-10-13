@@ -50,5 +50,19 @@ def translate(final_summary_id, language):
 
     return completion.choices[0].message.content
 
+def save_translate_to_firestore(document_id, summary):
+    """
+    Save the generated summary to Firestore under the 'translated_report' collection.
+    """
+    try:
+        summary_ref = db.collection("translated_report").document(document_id)
+        summary_data = {"document_id": document_id, "summary": summary}
+
+        # Save or update the summary document in Firestore
+        summary_ref.set(summary_data)
+    except Exception as e:
+        print(f"Error saving summary to Firestore: {str(e)}")
+
 if __name__ == "__main__":
-    print(translate("test_large","Spanish"))
+    save_translate_to_firestore("japanese_large",translate("test_large","Japanese"))
+    
