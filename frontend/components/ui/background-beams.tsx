@@ -60,7 +60,7 @@ export const BackgroundBeams = React.memo(
     return (
       <div
         className={cn(
-          "absolute  h-full w-full inset-0  [mask-size:40px] [mask-repeat:no-repeat] flex items-center justify-center",
+          "absolute  h-full w-full  [mask-size:40px] [mask-repeat:no-repeat] flex items-center justify-center bg-[#2C514C]",
           className
         )}
       >
@@ -112,10 +112,10 @@ export const BackgroundBeams = React.memo(
                   delay: Math.random() * 10,
                 }}
               >
-                <stop stopColor="#18CCFC" stopOpacity="0"></stop>
-                <stop stopColor="#18CCFC"></stop>
-                <stop offset="32.5%" stopColor="#6344F5"></stop>
-                <stop offset="100%" stopColor="#AE48FF" stopOpacity="0"></stop>
+                <stop stopColor="white" stopOpacity="0"></stop>
+                <stop stopColor="white"></stop>
+                <stop offset="32.5%" stopColor="white"></stop>
+                <stop offset="100%" stopColor="white" stopOpacity="0"></stop>
               </motion.linearGradient>
             ))}
 
@@ -127,9 +127,9 @@ export const BackgroundBeams = React.memo(
               gradientUnits="userSpaceOnUse"
               gradientTransform="translate(352 34) rotate(90) scale(555 1560.62)"
             >
-              <stop offset="0.0666667" stopColor="var(--neutral-300)"></stop>
-              <stop offset="0.243243" stopColor="var(--neutral-300)"></stop>
-              <stop offset="0.43594" stopColor="white" stopOpacity="0"></stop>
+              <stop offset="0.0666667" stopColor="#2C514C"></stop>
+              <stop offset="0.243243" stopColor="#2C514C"></stop>
+              <stop offset="0.43594" stopColor="#2C514C" stopOpacity="0"></stop>
             </radialGradient>
           </defs>
         </svg>

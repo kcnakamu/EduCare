@@ -3,7 +3,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
-
+import { getAuth } from "firebase/auth";
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDx_QNeZfJQO9ONqXWK1aheVXv7AFLgqDQ",
@@ -21,7 +21,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firestore
 const db = getFirestore(app);
-
+const auth = getAuth(app);
 // Initialize Analytics only if the environment supports it (e.g., browser)
 let analytics;
 if (typeof window !== "undefined") {
@@ -35,4 +35,4 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { db };
+export { auth, db };
